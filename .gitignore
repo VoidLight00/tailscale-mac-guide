@@ -1,0 +1,11 @@
+# Vercel
+.vercel
+
+# macOS
+.DS_Store
+
+# Temp files
+*.swp
+*.swo
+*~
+.env*.local

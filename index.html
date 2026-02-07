@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>맥 원격 접속 완벽 가이드 | Tailscale + 화면 공유</title>
+    <meta name="description" content="맥미니와 맥북을 Tailscale로 연결해서 어디서든 안전하게 원격 접속하는 방법. 외부 와이파이 문제 해결까지 한번에.">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="맥 원격 접속 완벽 가이드">
+    <meta property="og:description" content="Tailscale + macOS 화면 공유로 외부에서 집 맥미니 제어하기">
+    <meta property="og:type" content="website">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Theme -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        tailscale: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .code-block {
+            position: relative;
+        }
+        
+        .copy-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .code-block:hover .copy-button {
+            opacity: 1;
+        }
+        
+        .copy-button.copied {
+            opacity: 1 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    
+    <!-- Header -->
+    <header class="border-b border-gray-800 sticky top-0 bg-gray-900/95 backdrop-blur z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-tailscale-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                </svg>
+                <h1 class="text-xl font-semibold">맥 원격 접속 가이드</h1>
+            </div>
+            <button onclick="toggleDarkMode()" class="p-2 rounded-lg hover:bg-gray-800 transition">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-12">
+        
+        <!-- Intro -->
+        <section class="mb-16">
+            <div class="bg-gradient-to-r from-tailscale-600 to-tailscale-500 rounded-2xl p-8 mb-8">
+                <h2 class="text-3xl font-bold mb-4">🏠 집 맥미니를 외부에서 제어하기</h2>
+                <p class="text-lg text-tailscale-50">Tailscale VPN + macOS 화면 공유로 안전하고 빠르게 원격 접속하는 방법을 알려드립니다.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-4">
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div class="text-3xl mb-2">🔒</div>
+                    <h3 class="font-semibold mb-2">안전한 연결</h3>
+                    <p class="text-sm text-gray-400">포트포워딩 없이 WireGuard 기반 암호화 터널</p>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <h3 class="font-semibold mb-2">빠른 설정</h3>
+                    <p class="text-sm text-gray-400">10분이면 완료. 네트워크 지식 불필요</p>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <div class="text-3xl mb-2">🌐</div>
+                    <h3 class="font-semibold mb-2">어디서나 접속</h3>
+                    <p class="text-sm text-gray-400">카페, 사무실, 해외 어디서든 OK</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 1: Mac Mini Setup -->
+        <section id="step1" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full bg-tailscale-600 text-white text-sm">1</span>
+                맥미니 화면 공유 활성화
+            </h2>
+            
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-4">
+                <h3 class="font-semibold mb-4 text-tailscale-400">📍 시스템 설정 경로</h3>
+                <ol class="space-y-3 text-gray-300">
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">1.</span>
+                        <span>맥미니에서 <strong>시스템 설정</strong> 열기 (구버전은 "시스템 환경설정")</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">2.</span>
+                        <span><strong>일반</strong> → <strong>공유</strong> 클릭</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">3.</span>
+                        <span><strong>"화면 공유"</strong> 토글 켜기 (원격 관리는 OFF 필수!)</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">4.</span>
+                        <span>접속 허용: <strong>"이 Mac의 모든 사용자"</strong> 또는 특정 계정 선택</span>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4">
+                <div class="flex gap-2 items-start">
+                    <svg class="w-5 h-5 text-yellow-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/>
+                    </svg>
+                    <div>
+                        <strong class="text-yellow-500">중요!</strong>
+                        <p class="text-sm text-gray-300 mt-1">"원격 관리"와 "화면 공유"를 동시에 켜면 VNC 프로토콜 충돌 발생. <strong>원격 관리는 반드시 OFF</strong>로 설정하세요.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Tailscale Install -->
+        <section id="step2" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full bg-tailscale-600 text-white text-sm">2</span>
+                Tailscale 설치 (맥미니 + 맥북 둘 다)
+            </h2>
+            
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-4">
+                <h3 class="font-semibold mb-4 text-tailscale-400">🍎 App Store에서 설치</h3>
+                <ol class="space-y-3 text-gray-300 mb-6">
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">1.</span>
+                        <span>Mac App Store에서 <strong>"Tailscale"</strong> 검색</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">2.</span>
+                        <span>무료 다운로드 후 설치</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">3.</span>
+                        <span>앱 실행 → <strong>같은 계정</strong>으로 로그인 (Google/Apple/Microsoft 중 선택)</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">4.</span>
+                        <span>상단 메뉴바에 Tailscale 아이콘 뜨면 완료</span>
+                    </li>
+                </ol>
+
+                <div class="code-block">
+                    <button onclick="copyCode(this, 'brew install tailscale')" class="copy-button px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm">
+                        복사
+                    </button>
+                    <pre class="bg-gray-900 rounded-lg p-4 overflow-x-auto"><code class="text-tailscale-400"># Homebrew로 설치하는 방법도 있음 (선택)
+brew install tailscale</code></pre>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                <h3 class="font-semibold mb-3 text-tailscale-400">✅ 설치 확인</h3>
+                <ul class="space-y-2 text-gray-300">
+                    <li class="flex gap-2 items-center">
+                        <svg class="w-4 h-4 text-tailscale-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                        상단 메뉴바에서 Tailscale 아이콘 클릭 → 기기 목록에 두 맥이 보임
+                    </li>
+                    <li class="flex gap-2 items-center">
+                        <svg class="w-4 h-4 text-tailscale-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                        맥미니 이름 옆에 IP 주소 (예: <code class="bg-gray-900 px-2 py-0.5 rounded text-sm">100.x.x.x</code>)
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Step 3: Connect -->
+        <section id="step3" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full bg-tailscale-600 text-white text-sm">3</span>
+                맥북에서 맥미니 접속
+            </h2>
+            
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-4">
+                <h3 class="font-semibold mb-4 text-tailscale-400">🖥️ Finder "서버에 연결" 방법</h3>
+                <ol class="space-y-3 text-gray-300 mb-6">
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">1.</span>
+                        <span>맥북에서 <strong>Finder</strong> 열기</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">2.</span>
+                        <span>상단 메뉴 <strong>이동</strong> → <strong>서버에 연결…</strong> (⌘K)</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">3.</span>
+                        <span>서버 주소 입력:</span>
+                    </li>
+                </ol>
+
+                <div class="code-block mb-4">
+                    <button onclick="copyCode(this, 'vnc://100.x.x.x')" class="copy-button px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm">
+                        복사
+                    </button>
+                    <pre class="bg-gray-900 rounded-lg p-4"><code class="text-tailscale-400">vnc://100.x.x.x</code></pre>
+                </div>
+
+                <p class="text-sm text-gray-400 mb-4">또는 MagicDNS 사용 (더 편함):</p>
+
+                <div class="code-block mb-6">
+                    <button onclick="copyCode(this, 'vnc://macmini.your-tailnet.ts.net')" class="copy-button px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm">
+                        복사
+                    </button>
+                    <pre class="bg-gray-900 rounded-lg p-4"><code class="text-tailscale-400">vnc://macmini.your-tailnet.ts.net</code></pre>
+                </div>
+
+                <ol start="4" class="space-y-3 text-gray-300">
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">4.</span>
+                        <span><strong>연결</strong> 클릭</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">5.</span>
+                        <span>맥미니 계정 아이디/비밀번호 입력</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="text-tailscale-500 font-mono">6.</span>
+                        <span>화면 품질: <strong>고성능</strong> 선택 (소리/해상도 지원)</span>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+                <div class="flex gap-2 items-start">
+                    <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/>
+                    </svg>
+                    <div>
+                        <strong class="text-blue-400">Tip</strong>
+                        <p class="text-sm text-gray-300 mt-1">Tailscale 메뉴에서 맥미니 우클릭 → "Copy IP" 하면 주소 바로 복사됩니다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Troubleshooting -->
+        <section id="troubleshoot" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full bg-red-600 text-white text-sm">!</span>
+                문제 해결
+            </h2>
+
+            <div class="space-y-4">
+                <!-- Issue 1 -->
+                <details class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
+                        </svg>
+                        Tailscale 목록에 기기가 안 보여요
+                    </summary>
+                    <div class="p-4 pt-0 text-gray-300 space-y-2">
+                        <p class="font-semibold text-tailscale-400">원인:</p>
+                        <ul class="list-disc list-inside space-y-1 ml-4">
+                            <li>로그인 계정이 다름</li>
+                            <li>인터넷 연결 끊김</li>
+                            <li>Tailscale 세션 만료 (5개월)</li>
+                        </ul>
+                        <p class="font-semibold text-tailscale-400 mt-4">해결:</p>
+                        <ul class="list-disc list-inside space-y-1 ml-4">
+                            <li>두 맥 모두 <strong>같은 계정</strong>으로 로그인했는지 확인</li>
+                            <li>Tailscale 앱 재로그인 시도</li>
+                            <li>와이파이 연결 확인 (핫스팟 추천, 아래 참고)</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <!-- Issue 2 -->
+                <details class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
+                        </svg>
+                        외부 와이파이에서 연결 안 됨
+                    </summary>
+                    <div class="p-4 pt-0 text-gray-300 space-y-2">
+                        <p class="font-semibold text-tailscale-400">원인:</p>
+                        <p>공공 와이파이/카페 네트워크가 VPN 포트 차단</p>
+                        <p class="font-semibold text-tailscale-400 mt-4">해결:</p>
+                        <div class="bg-gray-900 rounded-lg p-4 mt-2">
+                            <p class="font-semibold mb-2">🔥 핫스팟 사용 (최고의 해결책)</p>
+                            <ol class="space-y-1 text-sm list-decimal list-inside ml-2">
+                                <li>아이폰/안드로이드 개인 핫스팟 켜기</li>
+                                <li>맥북을 핫스팟에 연결</li>
+                                <li>Tailscale 연결 → 안정적 터널 형성</li>
+                            </ol>
+                            <p class="text-xs text-gray-400 mt-2">핫스팟은 데이터 사용량 적음 (화면 공유는 네트워크 효율적)</p>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Issue 3 -->
+                <details class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
+                        </svg>
+                        화면이 까맣게 나오거나 연결 끊김
+                    </summary>
+                    <div class="p-4 pt-0 text-gray-300 space-y-2">
+                        <p class="font-semibold text-tailscale-400">원인:</p>
+                        <ul class="list-disc list-inside space-y-1 ml-4">
+                            <li>맥미니 화면 공유 꺼짐</li>
+                            <li>잠자기 모드 진입</li>
+                            <li>"원격 관리"와 충돌</li>
+                        </ul>
+                        <p class="font-semibold text-tailscale-400 mt-4">해결:</p>
+                        <ul class="list-disc list-inside space-y-1 ml-4">
+                            <li><strong>화면 공유 ON</strong> 재확인 (시스템 설정 → 공유)</li>
+                            <li><strong>원격 관리 OFF</strong> 필수</li>
+                            <li>에너지 절약: "전원 어댑터 연결 시 잠자기 안 함" 설정</li>
+                            <li>외장 모니터 연결된 경우: 전원/디스플레이 설정 확인</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- Advanced Tips -->
+        <section id="tips" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <svg class="w-8 h-8 text-tailscale-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                고급 팁
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h3 class="font-semibold mb-3 text-tailscale-400">🌙 맥미니 24시간 켜두기</h3>
+                    <p class="text-sm text-gray-300 mb-2">외부 접속용이라면:</p>
+                    <ul class="text-sm text-gray-400 space-y-1 list-disc list-inside">
+                        <li>에너지 절약 → "디스플레이 끄기" 시간 설정</li>
+                        <li>"전원 어댑터 연결 시 자동으로 잠자기 해제"</li>
+                        <li>디스플레이는 꺼지지만 시스템 깨어있음</li>
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h3 class="font-semibold mb-3 text-tailscale-400">📱 아이패드/아이폰 접속</h3>
+                    <p class="text-sm text-gray-300 mb-2">모바일에서도 가능:</p>
+                    <ul class="text-sm text-gray-400 space-y-1 list-disc list-inside">
+                        <li>App Store에서 Tailscale + RealVNC Viewer 설치</li>
+                        <li>동일한 방법으로 vnc://IP 접속</li>
+                        <li>터치로 마우스 제어 가능</li>
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h3 class="font-semibold mb-3 text-tailscale-400">🔐 보안 강화</h3>
+                    <ul class="text-sm text-gray-400 space-y-1 list-disc list-inside">
+                        <li>Tailscale ACL 설정으로 특정 기기만 접근 허용</li>
+                        <li>VNC 암호 별도 설정 (화면 공유 설정에서)</li>
+                        <li>2FA 활성화 (Tailscale 계정)</li>
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h3 class="font-semibold mb-3 text-tailscale-400">⚡ 속도 최적화</h3>
+                    <ul class="text-sm text-gray-400 space-y-1 list-disc list-inside">
+                        <li>Tailscale은 가능하면 직접 P2P 연결 (DERP 릴레이 회피)</li>
+                        <li>화면 공유 품질: "고성능" vs "최상 품질" 선택</li>
+                        <li>유선랜 사용 시 더 안정적</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="mb-16">
+            <h2 class="text-2xl font-bold mb-6">자주 묻는 질문</h2>
+            
+            <div class="space-y-3">
+                <details class="bg-gray-800 rounded-lg border border-gray-700">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold">Tailscale 무료인가요?</summary>
+                    <div class="px-4 pb-4 text-gray-300 text-sm">
+                        네, 개인 사용은 완전 무료입니다. 최대 100대 기기, 1명 사용자까지 무제한. 팀 플랜은 유료입니다.
+                    </div>
+                </details>
+
+                <details class="bg-gray-800 rounded-lg border border-gray-700">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold">포트포워딩 필요한가요?</summary>
+                    <div class="px-4 pb-4 text-gray-300 text-sm">
+                        전혀 필요 없습니다. Tailscale이 자동으로 NAT를 뚫고 P2P 연결을 만들어줍니다. 공유기 설정 변경 불필요.
+                    </div>
+                </details>
+
+                <details class="bg-gray-800 rounded-lg border border-gray-700">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold">Windows에서도 되나요?</summary>
+                    <div class="px-4 pb-4 text-gray-300 text-sm">
+                        네! Tailscale은 Windows, Linux, Android, iOS 모두 지원합니다. 윈도우 → 맥 접속도 가능하며, RDP 대신 VNC를 사용하면 됩니다.
+                    </div>
+                </details>
+
+                <details class="bg-gray-800 rounded-lg border border-gray-700">
+                    <summary class="p-4 cursor-pointer hover:bg-gray-750 font-semibold">속도가 느려요</summary>
+                    <div class="px-4 pb-4 text-gray-300 text-sm">
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>화면 공유 품질을 "최상 품질" → "고성능"으로 변경</li>
+                            <li>핫스팟 사용 (공공 와이파이보다 빠름)</li>
+                            <li>Tailscale 상태에서 "Direct" 연결 확인 (Relay 사용 시 느림)</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- Footer CTA -->
+        <section class="bg-gradient-to-r from-tailscale-600 to-tailscale-500 rounded-2xl p-8 text-center">
+            <h2 class="text-2xl font-bold mb-4">이제 어디서든 내 맥을 제어하세요 🚀</h2>
+            <p class="text-tailscale-50 mb-6">10분이면 설정 완료. 안전하고 빠른 원격 접속의 시작.</p>
+            <a href="#step1" class="inline-block bg-white text-tailscale-700 font-semibold px-6 py-3 rounded-lg hover:bg-gray-100 transition">
+                처음부터 다시 보기
+            </a>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-16 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+            <p>Made with 😈 by Belphegor | 2026</p>
+            <p class="mt-2">이 가이드는 오픈소스입니다. 자유롭게 공유하세요.</p>
+        </footer>
+
+    </main>
+
+    <!-- Scripts -->
+    <script>
+        // Dark mode toggle
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'false') {
+            document.documentElement.classList.remove('dark');
+        }
+
+        // Copy code function
+        function copyCode(button, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = '✓ 복사됨!';
+                button.classList.add('copied', 'bg-tailscale-600');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied', 'bg-tailscale-600');
+                }, 2000);
+            });
+        }
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
